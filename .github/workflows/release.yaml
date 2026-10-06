@@ -1,0 +1,69 @@
+name: Release
+
+on:
+    push:
+        tags:
+            - "v*"
+
+concurrency:
+    group: release-${{ github.ref }}
+    cancel-in-progress: false
+
+permissions:
+    contents: write
+
+jobs:
+    publish-tag:
+        name: Build & Flatten to Tag
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Setup Bun
+              uses: oven-sh/setup-bun@v2
+              with:
+                  bun-version: latest
+
+            - name: Install dependencies
+              run: bun install --frozen-lockfile
+
+            - name: Build TypeScript
+              run: |
+                  rm -rf dist
+                  bunx tsc
+
+            - name: Flatten dist and rewrite package.json for Tag
+              run: |
+                  git config user.name "github-actions[bot]"
+                  git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+                  mkdir -p /tmp/pkg
+                  cp -r dist/* /tmp/pkg/
+                  cp package.json /tmp/pkg/
+
+                  sed -i 's|\./dist/|\./|g' /tmp/pkg/package.json
+
+                  git rm -rf .
+                  git clean -fxd
+
+                  cp -r /tmp/pkg/* .
+
+                  git add -A -f
+                  git commit -m "chore(release): pure root distribution for ${{ github.ref_name }} [skip ci]"
+
+                  git tag -f -a "${{ github.ref_name }}" -m "Release ${{ github.ref_name }}"
+                  git push origin "refs/tags/${{ github.ref_name }}" --force
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  tag_name: ${{ github.ref_name }}
+                  name: ${{ github.ref_name }}
+                  generate_release_notes: true
+                  prerelease: ${{ contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') || contains(github.ref_name, '-rc') }}
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
