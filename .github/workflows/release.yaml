@@ -35,7 +35,7 @@ jobs:
               run: |
                   rm -rf dist
                   bun build ./src/index.ts --outdir ./dist --target node --format esm
-                  bunx tsc --emitDeclarationOnly
+                  bunx tsc --emitDeclarationOnly --outDir ./dist
 
             - name: Flatten dist and rewrite package.json for Tag
               run: |
