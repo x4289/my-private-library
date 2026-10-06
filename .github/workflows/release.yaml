@@ -37,7 +37,6 @@ jobs:
                   bun build ./src/index.ts --outfile ./dist/index.js --target node --format esm
                   bunx tsc --emitDeclarationOnly --outDir ./dist
 
-                  # ตรวจสอบว่าไฟล์ถูกสร้างจริง
                   if [ ! -f "dist/index.js" ]; then
                     echo "::error::dist/index.js was not generated!"
                     exit 1
@@ -48,20 +47,17 @@ jobs:
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-                  # 1. พักเฉพาะ dist และ package.json ไว้ที่ /tmp
                   rm -rf /tmp/pkg
                   mkdir -p /tmp/pkg
                   cp -r dist /tmp/pkg/
                   cp package.json /tmp/pkg/
+                  # cp README.md /tmp/pkg/
 
-                  # 2. ล้าง workspace เดิมทิ้งทั้งหมด (src, config, dotfiles, node_modules)
                   git rm -rf .
                   git clean -fxd
 
-                  # 3. นำ dist และ package.json กลับมาวางที่ workspace
                   cp -r /tmp/pkg/* .
 
-                  # 4. Commit และย้าย Tag
                   git add -A -f
                   git commit -m "chore(release): release ${{ github.ref_name }} [skip ci]"
 
