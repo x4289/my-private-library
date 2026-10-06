@@ -34,7 +34,8 @@ jobs:
             - name: Build TypeScript
               run: |
                   rm -rf dist
-                  bunx tsc
+                  bun build ./src/index.ts --outdir ./dist --target node --format esm
+                  bunx tsc --emitDeclarationOnly
 
             - name: Flatten dist and rewrite package.json for Tag
               run: |
@@ -43,9 +44,26 @@ jobs:
 
                   mkdir -p /tmp/pkg
                   cp -r dist/* /tmp/pkg/
-                  cp package.json /tmp/pkg/
 
-                  sed -i 's|\./dist/|\./|g' /tmp/pkg/package.json
+                  # กรองเฉพาะ field ที่สำคัญ + แปลง path ./dist/ เป็น ./ ในคำสั่งเดียว
+                  jq '
+                      {
+                      name: .name,
+                      version: .version,
+                      type: .type,
+                      main: (.main // "./index.js" | sub("\\./dist/"; "./")),
+                      module: (.module // "./index.js" | sub("\\./dist/"; "./")),
+                      types: (.types // "./index.d.ts" | sub("\\./dist/"; "./")),
+                      exports: {
+                          ".": {
+                          types: (.exports["."].types // "./index.d.ts" | sub("\\./dist/"; "./")),
+                          import: (.exports["."].import // "./index.js" | sub("\\./dist/"; "./"))
+                          }
+                      },
+                      sideEffects: (.sideEffects // false),
+                      dependencies: .dependencies
+                      } | del(.dependencies | select(. == null or . == {}))
+                  ' package.json > /tmp/pkg/package.json
 
                   git rm -rf .
                   git clean -fxd
