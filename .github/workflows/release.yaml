@@ -14,11 +14,11 @@ permissions:
 
 jobs:
     publish-tag:
-        name: Build & Flatten to Tag
+        name: Build & Publish Tag
         runs-on: ubuntu-latest
 
         steps:
-            - name: Checkout code
+            - name: Checkout repository
               uses: actions/checkout@v4
               with:
                   fetch-depth: 0
@@ -31,47 +31,39 @@ jobs:
             - name: Install dependencies
               run: bun install --frozen-lockfile
 
-            - name: Build TypeScript
+            - name: Build Library
               run: |
                   rm -rf dist
-                  bun build ./src/index.ts --outdir ./dist --target node --format esm
+                  bun build ./src/index.ts --outfile ./dist/index.js --target node --format esm
                   bunx tsc --emitDeclarationOnly --outDir ./dist
 
-            - name: Flatten dist and rewrite package.json for Tag
+                  # ตรวจสอบว่าไฟล์ถูกสร้างจริง
+                  if [ ! -f "dist/index.js" ]; then
+                    echo "::error::dist/index.js was not generated!"
+                    exit 1
+                  fi
+
+            - name: Package & Overwrite Tag
               run: |
                   git config user.name "github-actions[bot]"
                   git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+                  # 1. พักเฉพาะ dist และ package.json ไว้ที่ /tmp
+                  rm -rf /tmp/pkg
                   mkdir -p /tmp/pkg
-                  cp -r dist/* /tmp/pkg/
+                  cp -r dist /tmp/pkg/
+                  cp package.json /tmp/pkg/
 
-                  # กรองเฉพาะ field ที่สำคัญ + แปลง path ./dist/ เป็น ./ ในคำสั่งเดียว
-                  jq '
-                      {
-                      name: .name,
-                      version: .version,
-                      type: .type,
-                      main: (.main // "./index.js" | sub("\\./dist/"; "./")),
-                      module: (.module // "./index.js" | sub("\\./dist/"; "./")),
-                      types: (.types // "./index.d.ts" | sub("\\./dist/"; "./")),
-                      exports: {
-                          ".": {
-                          types: (.exports["."].types // "./index.d.ts" | sub("\\./dist/"; "./")),
-                          import: (.exports["."].import // "./index.js" | sub("\\./dist/"; "./"))
-                          }
-                      },
-                      sideEffects: (.sideEffects // false),
-                      dependencies: .dependencies
-                      } | del(.dependencies | select(. == null or . == {}))
-                  ' package.json > /tmp/pkg/package.json
-
+                  # 2. ล้าง workspace เดิมทิ้งทั้งหมด (src, config, dotfiles, node_modules)
                   git rm -rf .
                   git clean -fxd
 
+                  # 3. นำ dist และ package.json กลับมาวางที่ workspace
                   cp -r /tmp/pkg/* .
 
+                  # 4. Commit และย้าย Tag
                   git add -A -f
-                  git commit -m "chore(release): pure root distribution for ${{ github.ref_name }} [skip ci]"
+                  git commit -m "chore(release): release ${{ github.ref_name }} [skip ci]"
 
                   git tag -f -a "${{ github.ref_name }}" -m "Release ${{ github.ref_name }}"
                   git push origin "refs/tags/${{ github.ref_name }}" --force
