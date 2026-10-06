@@ -1,0 +1,1 @@
+export { greetAnimal } from './get';
