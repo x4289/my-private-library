@@ -37,8 +37,8 @@ jobs:
                   bun build ./src/index.ts --outfile ./dist/index.js --target node --format esm
                   bunx tsc --emitDeclarationOnly --outDir ./dist
 
-                  if [ ! -f "dist/index.js" ]; then
-                    echo "::error::dist/index.js was not generated!"
+                  if [ ! -f "dist/index.js" ] || [ ! -f "dist/index.d.ts" ]; then
+                    echo "::error::Build failed: dist/index.js or dist/index.d.ts was not generated!"
                     exit 1
                   fi
 
@@ -51,7 +51,7 @@ jobs:
                   mkdir -p /tmp/pkg
                   cp -r dist /tmp/pkg/
                   cp package.json /tmp/pkg/
-                  # cp README.md /tmp/pkg/
+                  [ -f README.md ] && cp README.md /tmp/pkg/
 
                   git rm -rf .
                   git clean -fxd

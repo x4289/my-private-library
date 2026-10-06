@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "release": "bumpp --commit --tag --push"
+    "release": "bumpp"
   },
   "sideEffects": false,
   "devDependencies": {
